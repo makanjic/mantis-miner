@@ -118,8 +118,8 @@ async def get_asset_prices(session: aiohttp.ClientSession) -> dict[str, float] |
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--wallet.name", required=True)
-    p.add_argument("--wallet.hotkey", required=True)
+    p.add_argument("--wallet.name", default="validator")
+    p.add_argument("--wallet.hotkey", default="validator_hotkey")
     p.add_argument("--network", default="finney")
     p.add_argument("--netuid", type=int, default=config.NETUID)
     p.add_argument(
@@ -134,12 +134,23 @@ def main():
         default=SAVE_INTERVAL * 12,
         help="How often to save the datalog, in seconds (default: SAVE_INTERVAL blocks * 12s).",
     )
+    p.add_argument(
+        "--set_weights",
+        action="store_true",
+        default=False,
+        help="Whether to set weights based on salience calculations.",
+    )
     args = p.parse_args()
 
     while True:
         try:
             sub = bt.subtensor(network=args.network)
-            wallet = bt.wallet(name=getattr(args, "wallet.name"), hotkey=getattr(args, "wallet.hotkey"))
+            if args.set_weights:
+                logging.info("SET_WEIGHTS is True, will set weights on chain when calculated.")
+                wallet = bt.wallet(name=getattr(args, "wallet.name"), hotkey=getattr(args, "wallet.hotkey"))
+            else:
+                logging.info("SET_WEIGHTS is False, will NOT set weights on chain.")
+                wallet = None
             mg = bt.metagraph(netuid=args.netuid, network=args.network, sync=True)
             break
         except Exception as e:
@@ -320,6 +331,10 @@ async def run_main_loop(
 
                         if not sal:
                             weights_logger.info("Salience is empty. Assigning weights only to young UIDs if any.")
+                        else:
+                            weights_logger.info(f"Salience calculated for {len(sal)} UIDs.")
+                            weights_logger.debug(f"Salience scores:\n{json.dumps(sal.items())}")
+                            weights_logger.info(f"Salience stats - min: {min(sal.values()):.6f}, max: {max(sal.values()):.6f}, mean: {np.mean(list(sal.values())):.6f}")
                         
                         uids = metagraph.uids.tolist()
 
@@ -384,6 +399,10 @@ async def run_main_loop(
                         weights_to_log = {uid: f"{weight:.8f}" for uid, weight in normalized_weights.items() if uid in uids and weight > 0}
                         weights_logger.info(f"Normalized weights for block {block_snapshot}: {json.dumps(weights_to_log)}")
                         weights_logger.info(f"Final tensor sum before setting weights: {final_w.sum().item()}")
+                        
+                        if not cli_args.set_weights:
+                            weights_logger.info("SET_WEIGHTS is False, skipping weight set on chain.")
+                            return
                         
                         try:
                             thread_sub = bt.subtensor(network=cli_args.network)
