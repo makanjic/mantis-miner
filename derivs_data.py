@@ -42,7 +42,8 @@ def fetch_spot_klines_window(symbol: str, end_ts, lookback_minutes: int, interva
     js = _get(f"{BINANCE_SPOT}/api/v3/klines", params)
     if not js:
         return pd.DataFrame(columns=["open","high","low","close","volume"])
-    df = pd.DataFrame(js, columns=["t","o","h","l","c","v","ct","qv","n","taker_bv","taker_qv","i","b","a"])
+    columns=["t","o","h","l","c","v","ct","qv","n","taker_bv","taker_qv","i","b","a"]
+    df = pd.DataFrame([row[:12] for row in js], columns=columns[:12])
     df["timestamp"] = pd.to_datetime(df["t"], unit="ms", utc=True)
     out = df.set_index("timestamp")[["o","h","l","c","v"]].astype(float).rename(
         columns={"o":"open","h":"high","l":"low","c":"close","v":"volume"}
@@ -127,7 +128,8 @@ if __name__ == "__main__":
     print("Open interest stats:")
     print(fetch_open_interest_stats_window(args.symbol, end_ts, args.lookback_min, period="5m").tail(5), "\n")
 
-    print("Liquidations:")
-    print(fetch_liquidations_window(args.symbol, end_ts, args.lookback_min).tail(5), "\n")
+    # deprecated; see btc_data_collector.py
+    #print("Liquidations:")
+    #print(fetch_liquidations_window(args.symbol, end_ts, args.lookback_min).tail(5), "\n")
 
     print("OK ✓")

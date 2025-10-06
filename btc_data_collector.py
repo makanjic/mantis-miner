@@ -20,7 +20,7 @@ from derivs_data import (
     fetch_funding_window,
     fetch_long_short_ratio_window,
     fetch_open_interest_stats_window,
-    fetch_liquidations_window,
+    #fetch_liquidations_window,
 )
 from options_data import get_dvol_now
 from mempool_data import mempool_snapshot_now
@@ -91,14 +91,15 @@ def refresh_derivs_windows(c: FeatureCaches, ts: pd.Timestamp, cfg: CollectorCon
     if not oih.empty:
         c.derivs.set_series("open_interest", oih["sumOpenInterest"])
 
+    # deprecated; binance liquidations endpoint is out of maintenance
     # Liquidations (aggregate to per-minute net by side)
-    liq = fetch_liquidations_window("BTCUSDT", ts, cfg.derivs_lookback_min)
-    if not liq.empty:
-        liq = liq.copy()
-        liq["minute"] = liq.index.floor("T")
-        grp = liq.groupby(["minute", "side"])["liq_quote"].sum().unstack(fill_value=0.0)
-        c.derivs.set_series("liq_buy", grp.get("BUY", pd.Series(dtype=float)))
-        c.derivs.set_series("liq_sell", grp.get("SELL", pd.Series(dtype=float)))
+    #liq = fetch_liquidations_window("BTCUSDT", ts, cfg.derivs_lookback_min)
+    #if not liq.empty:
+    #    liq = liq.copy()
+    #    liq["minute"] = liq.index.floor("T")
+    #    grp = liq.groupby(["minute", "side"])["liq_quote"].sum().unstack(fill_value=0.0)
+    #    c.derivs.set_series("liq_buy", grp.get("BUY", pd.Series(dtype=float)))
+    #    c.derivs.set_series("liq_sell", grp.get("SELL", pd.Series(dtype=float)))
 
 
 def refresh_options_now(c: FeatureCaches, ts: pd.Timestamp):
