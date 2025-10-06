@@ -420,6 +420,8 @@ def multi_salience(
             w = float(spec.get("weight", 1.0))
             per_challenge.append((s, w))
             total_w += w
+        logging.info(f"Processed salience for {ticker}, found {len(s)} hotkeys.")
+        logging.info(f"Salience {ticker}: {s}")
     if not per_challenge or total_w <= 0:
         return {}
     all_hotkeys = set().union(*(s.keys() for s, _ in per_challenge))
