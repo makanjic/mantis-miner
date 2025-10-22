@@ -230,8 +230,8 @@ DEFAULT_SPECS: List[TimeSpec] = [
     TimeSpec("fund8h_sin", H8, "sin"),
     TimeSpec("fund8h_bump", H8, "vm", kappa=6.0),
     # You can add H6/H4 if you like:
-    # TimeSpec("cyc_6h_cos", H6, "cos"), TimeSpec("cyc_6h_sin", H6, "sin"),
-    # TimeSpec("cyc_4h_cos", H4, "cos"), TimeSpec("cyc_4h_sin", H4, "sin"),
+    TimeSpec("cyc_6h_cos", H6, "cos"), TimeSpec("cyc_6h_sin", H6, "sin"),
+    TimeSpec("cyc_4h_cos", H4, "cos"), TimeSpec("cyc_4h_sin", H4, "sin"),
 ]
 
 def make_default_time_features(
