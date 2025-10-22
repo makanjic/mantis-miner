@@ -19,4 +19,5 @@ pandas-datareader
 tqdm
 xgboost
 cryptography
+ccxt
 # pm2 (installed globally via npm)
