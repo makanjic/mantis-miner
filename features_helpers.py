@@ -12,6 +12,8 @@ __all__ = [
     "_prep_series", "_leq", "_resample_1m_ffill",
     "_z_last", "_delta_last", "_ret_last", "_bp_change_last",
     "_basis_change", "_sum_window", "_clip01",
+    "_safe_last", "_logret_series", "_rolling_mean_std", "_zscore",
+    "_realized_vol_from_r1", "_trend_slope", "_entropy_proxy", "_acf1", "_rsi",
 ]
 
 
@@ -20,8 +22,8 @@ __all__ = [
 def utc_floor_minute(x) -> pd.Timestamp:
     ts = pd.to_datetime(x, utc=True)
     if ts.tz is None:
-        ts = ts.tz_localize("UTC")
-    return ts.floor("T")
+        ts = ts.tz_convert("UTC")
+    return ts.floor("min")
 
 
 # ----------------------------- series hygiene ----------------------------- #
@@ -168,3 +170,90 @@ def _sum_window(s: pd.Series, minutes: int) -> float:
 def _clip01(x: float) -> float:
     """Hard clip to [-1,1]."""
     return float(max(-1.0, min(1.0, x)))
+
+
+def _safe_last(arr: np.ndarray, default: float = 0.0) -> float:
+    return float(arr[-1]) if arr.size else float(default)
+
+
+def _logret_series(close: np.ndarray) -> np.ndarray:
+    if close.size == 0:
+        return np.array([], dtype=float)
+    return np.diff(np.log(close), prepend=np.log(close[0]))
+
+
+def _rolling_mean_std(x: np.ndarray, w: int) -> Tuple[np.ndarray, np.ndarray]:
+    if x.size == 0:
+        return np.array([], dtype=float), np.array([], dtype=float)
+    s = pd.Series(x)
+    m = s.rolling(w, min_periods=max(5, w//10)).mean().to_numpy()
+    v = s.rolling(w, min_periods=max(5, w//10)).var().to_numpy()
+    std = np.sqrt(np.maximum(1e-12, v))
+    return m, std
+
+
+def _zscore(x: np.ndarray, w: int) -> np.ndarray:
+    mu, sd = _rolling_mean_std(x, w)
+    return (x - mu) / (sd + 1e-9)
+
+
+def _realized_vol_from_r1(r1: np.ndarray, w: int) -> np.ndarray:
+    # sqrt of rolling sum of r1^2 over window w
+    if r1.size == 0:
+        return np.array([], dtype=float)
+    r2 = r1**2
+    s = pd.Series(r2).rolling(w, min_periods=max(5, w//10)).sum().to_numpy()
+    return np.sqrt(np.maximum(1e-12, s))
+
+
+def _trend_slope(price: np.ndarray, w: int) -> float:
+    # standardized OLS slope over the last w minutes, then tanh-bound
+    if price.size < w + 5:
+        return 0.0
+    y = price[-w:]
+    t = np.arange(w, dtype=float)
+    t = (t - t.mean()) / (t.std() + 1e-9)
+    y = (y - y.mean()) / (y.std() + 1e-9)
+    slope = (t @ y) / (w - 1)
+    return float(np.tanh(slope))  # already in [-1, 1]
+
+
+def _entropy_proxy(r1: np.ndarray, w: int) -> float:
+    # 1 - |ACF1| over the last w minutes → map to [-1,1]
+    if r1.size < w + 2:
+        return 0.0
+    window = r1[-w:]
+    if np.std(window) < 1e-9:
+        val = 0.0
+    else:
+        acf1 = np.corrcoef(window[:-1], window[1:])[0, 1]
+        val = 1.0 - abs(float(acf1))           # in [0,1]
+    return float(2.0 * val - 1.0)              # map to [-1,1]
+
+
+def _acf1(r1: np.ndarray, w: int) -> float:
+    if r1.size < w + 2:
+        return 0.0
+    window = r1[-w:]
+    if np.std(window) < 1e-9:
+        return 0.0
+    return float(np.clip(np.corrcoef(window[:-1], window[1:])[0, 1], -1.0, 1.0))
+
+
+def _rsi(close: np.ndarray, period: int = 14) -> float:
+    # map RSI ∈ [0,100] to ~[-1,1] via (RSI-50)/12 and tanh
+    if close.size < period + 5:
+        return 0.0
+    diff = np.diff(close, prepend=close[0])
+    up = np.clip(diff, 0, None)
+    dn = -np.clip(diff, None, 0)
+    k = 2.0 / (period + 1.0)
+    def _ema(x):
+        out = np.zeros_like(x, dtype=float); acc = 0.0
+        for i, xi in enumerate(x):
+            acc = k*xi + (1-k)*acc if i else xi
+            out[i] = acc
+        return out
+    rs = _ema(up)[-1] / (_ema(dn)[-1] + 1e-9)
+    rsi = 100.0 - (100.0 / (1.0 + rs))
+    return float(np.tanh((rsi - 50.0) / 12.0))  # squashed to [-1,1]
