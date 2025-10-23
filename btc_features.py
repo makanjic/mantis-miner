@@ -173,8 +173,8 @@ if __name__ == "__main__":
         "spot_close": 59950 + synth_series(2000, vol=30).cumsum().abs(),
         "open_interest": 1.0e9 + 1.0e7 * synth_series(2000, vol=0.1),
         "long_short": 1.0 + 0.05 * synth_series(2000, vol=0.02),
-        "liq_buy": np.abs(synth_series(2000, vol=1.0)),
-        "liq_sell": np.abs(synth_series(2000, vol=1.1)),
+        #"liq_buy": np.abs(synth_series(2000, vol=1.0)),
+        #"liq_sell": np.abs(synth_series(2000, vol=1.1)),
     }
 
     # Options caches (keys expected by options_features.py)
